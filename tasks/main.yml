@@ -1,27 +1,45 @@
 ---
-- name: install dependencies
-  apt: pkg={{ item }} state=latest
-  with_items:
-    - libssl-dev
-    - python-pycurl
+# - name: install dependencies
+#   dnf: 
+#     name: '{{ item }}'
+#     state: latest
+#   with_items:
+#     - libssl-dev
+#     - python-pycurl
 
 - name: add Duo key
-  apt_key: url=http://pkg.duosecurity.com/APT-GPG-KEY-DUO
+  rpm_key:
+    state: present
+    key: https://duo.com/DUO-GPG-PUBLIC-KEY.asc
 
-- name: add Duo source
-  apt_repository: repo='deb http://pkg.duosecurity.com/Ubuntu precise main'
+- name: Install dnf template
+  template:
+    src: duosecurity.repo.j2
+    dest: /etc/yum.repos.d/duosecurity.repo
 
 - name: install Duo Unix SSH integration
-  apt: name=duo-unix state=latest update_cache=yes
+  dnf: 
+    name: duo_unix
+    state: latest
+    update_cache: yes
 
 - name: install Duo config
-  template: src=login_duo.conf.j2 dest=/etc/duo/login_duo.conf owner=sshd group=0 mode=0600
+  template:
+    src: login_duo.conf.j2
+    dest: /etc/duo/login_duo.conf
+    owner: sshd
+    group: root
+    mode: 0600
 
 - name: reconfigure SSH to allow DUO_PASSCODE environment variable
-  lineinfile: dest=/etc/ssh/sshd_config
-              line="AcceptEnv DUO_PASSCODE"
+  lineinfile: 
+    dest: /etc/ssh/sshd_config
+    line: 'AcceptEnv DUO_PASSCODE'
   notify: restart SSH
 
 - name: enable Duo security for remote logins
-  lineinfile: dest=/etc/ssh/sshd_config regexp=^ForceCommand line="ForceCommand /usr/sbin/login_duo"
+  lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: ^ForceCommand 
+    line: "ForceCommand /usr/sbin/login_duo"
   notify: restart SSH
